@@ -1,7 +1,23 @@
 import { GoogleGenAI, Type, Schema } from "@google/genai";
 import { FormattedDocument } from '../types';
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+// Lazy initialization to prevent app crash on load if key is missing
+let aiInstance: GoogleGenAI | null = null;
+
+const getAI = () => {
+    // The API key must be obtained exclusively from the environment variable process.env.API_KEY
+    // as per strict coding guidelines.
+    // Assume process.env.API_KEY is pre-configured and valid.
+    const apiKey = process.env.API_KEY;
+    if (!apiKey) {
+        console.warn("API Key is missing.");
+        return null;
+    }
+    if (!aiInstance) {
+        aiInstance = new GoogleGenAI({ apiKey: apiKey });
+    }
+    return aiInstance;
+};
 
 const responseSchema: Schema = {
   type: Type.OBJECT,
@@ -31,10 +47,12 @@ const responseSchema: Schema = {
 };
 
 export const formatTextWithGemini = async (rawText: string, themeId: string): Promise<FormattedDocument> => {
+  const ai = getAI();
+  if (!ai) {
+    throw new Error("API Key 未配置。请在环境变量中设置 API_KEY。");
+  }
+
   try {
-    // Note: themeId is passed but generally we use a standard rigorous formatter 
-    // to ensure best content structure regardless of visual theme.
-    
     const prompt = `
       角色：专业文档编辑与排版专家。
       任务：将输入的文本整理成一篇结构清晰、标点正确、排版美观的文档。
@@ -65,17 +83,33 @@ export const formatTextWithGemini = async (rawText: string, themeId: string): Pr
 
     const parsed = JSON.parse(text);
     
-    // Post-process sections
+    // Robust Post-processing
     const sections = parsed.sections.map((section: any) => {
+        // Normalize type to lowercase to avoid case-sensitive render issues
+        const type = (section.type || 'paragraph').toLowerCase();
+        let content = section.content;
+
         // Handle Lists (pipe separated)
-        if ((section.type === 'bullet_list' || section.type === 'numbered_list') && typeof section.content === 'string') {
-           if (section.content.includes('|')) {
-             return { ...section, content: section.content.split('|').map((s: string) => s.trim()) };
+        if ((type === 'bullet_list' || type === 'numbered_list')) {
+           if (typeof content === 'string') {
+               if (content.includes('|')) {
+                   content = content.split('|').map((s: string) => s.trim());
+               } else {
+                   content = [content];
+               }
            }
-           // Fallback if model didn't use pipe
-           return { ...section, content: [section.content] };
+           // If content is already array, keep it.
+        } else {
+            // For non-list items, ensure content is a string
+            if (Array.isArray(content)) {
+                content = content.join(' ');
+            }
+            if (typeof content !== 'string') {
+                content = String(content || '');
+            }
         }
-        return section;
+        
+        return { ...section, type, content };
     });
 
     return { ...parsed, sections };

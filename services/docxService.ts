@@ -1,5 +1,6 @@
 import { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType, ImageRun, UnderlineType, BorderStyle } from 'docx';
-import { saveAs } from 'file-saver';
+// Fix: Use default import for file-saver
+import FileSaver from 'file-saver';
 import { FormattedDocument, Theme } from '../types';
 
 export const exportToDocx = async (doc: FormattedDocument, theme: Theme) => {
@@ -193,5 +194,5 @@ export const exportToDocx = async (doc: FormattedDocument, theme: Theme) => {
   });
 
   const blob = await Packer.toBlob(docx);
-  saveAs(blob, `${doc.title || 'SmartDoc'}.docx`);
+  FileSaver.saveAs(blob, `${doc.title || 'SmartDoc'}.docx`);
 };

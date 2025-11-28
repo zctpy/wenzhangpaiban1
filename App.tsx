@@ -5,7 +5,8 @@ import { THEMES, BACKGROUNDS, DEFAULT_DOC, STOCK_IMAGES } from './constants';
 import { FormattedDocument, Theme, Background, DocumentSection } from './types';
 import { formatTextWithGemini } from './services/geminiService';
 import { X, CheckCircle2, Image as ImageIcon, Upload } from 'lucide-react';
-import { saveAs } from 'file-saver';
+// Fix: Use default import for file-saver to avoid "does not provide an export named 'saveAs'" error
+import FileSaver from 'file-saver';
 import html2canvas from 'html2canvas';
 
 const App: React.FC = () => {
@@ -116,7 +117,7 @@ const App: React.FC = () => {
         
         canvas.toBlob((blob) => {
             if (blob) {
-                saveAs(blob, `${formattedDoc.title || 'smartdoc_export'}.png`);
+                FileSaver.saveAs(blob, `${formattedDoc.title || 'smartdoc_export'}.png`);
                 setNotification("图片导出成功！");
             } else {
                 throw new Error("Blob generation failed");
@@ -177,7 +178,7 @@ const App: React.FC = () => {
       `;
       
       const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
-      saveAs(blob, `${formattedDoc.title || 'document'}.html`);
+      FileSaver.saveAs(blob, `${formattedDoc.title || 'document'}.html`);
       setNotification("HTML 导出成功！");
       setTimeout(() => setNotification(null), 2000);
   };
