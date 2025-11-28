@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { THEMES, BACKGROUNDS } from '../constants';
 import { Theme, Background } from '../types';
-import { Wand2, LayoutTemplate, Palette, ChevronDown, ZoomIn, ZoomOut, Image as ImageIcon, RotateCcw, Download, FileCode, Copy, ImageDown } from 'lucide-react';
+import { Wand2, LayoutTemplate, Palette, ChevronDown, ZoomIn, ZoomOut, Image as ImageIcon, RotateCcw, FileCode, Copy, ImageDown, FileText } from 'lucide-react';
 
 interface ControlPanelProps {
   currentTheme: Theme;
@@ -13,9 +13,9 @@ interface ControlPanelProps {
   onReset: () => void;
   onFormat: () => void;
   onCopy: () => void;
-  onExport: () => void;
   onExportImage: () => void;
   onExportHtml: () => void;
+  onExportWord: () => void;
   zoom: number;
   setZoom: (z: number) => void;
 }
@@ -25,7 +25,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
   currentBackground, setBackground,
   isFormatting, onInsertImage,
   onReset,
-  onFormat, onCopy, onExport, onExportImage, onExportHtml,
+  onFormat, onCopy, onExportImage, onExportHtml, onExportWord,
   zoom, setZoom
 }) => {
   const [activeDropdown, setActiveDropdown] = useState<'theme' | 'background' | null>(null);
@@ -204,20 +204,20 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                 <FileCode className="w-4 h-4" />
             </button>
 
+             <button 
+                onClick={onExportWord}
+                className="p-2 text-gray-600 hover:bg-gray-50 hover:text-blue-700 border border-gray-200 rounded-lg transition-colors"
+                title="导出 Word (DOCX)"
+            >
+                <FileText className="w-4 h-4" />
+            </button>
+
             <button 
                 onClick={onExportImage}
                 className="p-2 text-gray-600 hover:bg-gray-50 hover:text-blue-600 border border-gray-200 rounded-lg transition-colors"
                 title="导出为图片"
             >
                 <ImageDown className="w-4 h-4" />
-            </button>
-
-            <button 
-                onClick={onExport}
-                className="p-2 text-gray-600 hover:bg-gray-50 hover:text-indigo-600 border border-gray-200 rounded-lg transition-colors"
-                title="导出 PDF / 打印"
-            >
-                <Download className="w-4 h-4" />
             </button>
         </div>
 

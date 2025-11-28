@@ -8,6 +8,7 @@ import { X, CheckCircle2, Image as ImageIcon, Upload } from 'lucide-react';
 // Fix: Use default import for file-saver to avoid "does not provide an export named 'saveAs'" error
 import FileSaver from 'file-saver';
 import html2canvas from 'html2canvas';
+import { exportToDocx } from './services/docxService';
 
 const App: React.FC = () => {
   // Set defaults: Theme -> Fresh Green ('fresh'), Background -> Rice Paper ('rice-paper')
@@ -81,11 +82,17 @@ const App: React.FC = () => {
     }
   };
 
-  const handleExport = () => {
-    // Increase delay to ensure DOM is fully stable before print dialog
-    setTimeout(() => {
-        window.print();
-    }, 500);
+  const handleExportWord = async () => {
+    setNotification("正在生成 Word 文档...");
+    try {
+        await exportToDocx(formattedDoc, theme);
+        setNotification("Word 导出成功！");
+    } catch (e) {
+        console.error(e);
+        setError("Word 导出失败");
+    } finally {
+        setTimeout(() => setNotification(null), 2000);
+    }
   };
 
   const handleExportImage = async () => {
@@ -279,9 +286,9 @@ const App: React.FC = () => {
         }}
         onFormat={handleFormat}
         onCopy={handleCopy}
-        onExport={handleExport}
         onExportImage={handleExportImage}
         onExportHtml={handleExportHtml}
+        onExportWord={handleExportWord}
         zoom={zoom}
         setZoom={setZoom}
       />
