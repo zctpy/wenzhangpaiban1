@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SmartDoc 智能排版</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700&family=Noto+Serif+SC:wght@300;400;600;700&family=Zhi+Mang+Xing&family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ['"Noto Sans SC"', 'Inter', 'system-ui', 'sans-serif'],
+              serif: ['"Noto Serif SC"', '"Songti SC"', '"SimSun"', '"Adobe Song Std"', 'serif'],
+              display: ['"Zhi Mang Xing"', 'cursive'],
+              body: ['"Noto Sans SC"', 'sans-serif'],
+              'fangsong': ['"FangSong"', '"STFangsong"', '"Noto Serif SC"', 'serif'],
+            },
+            colors: {
+              paper: '#fdfbf7',
+            }
+          },
+        },
+      }
+    </script>
+    <style>
+      @media print {
+        @page {
+          margin: 0;
+          size: A4 portrait;
+        }
+        
+        /* 核心修复：强制重置所有屏幕布局限制 */
+        html, body, #root {
+          width: 100% !important;
+          height: auto !important;
+          min-height: 100% !important;
+          overflow: visible !important;
+          background: white !important;
+          display: block !important;
+          position: relative !important;
+        }
+
+        /* 隐藏UI组件 */
+        header, .print\:hidden, .delete-section-btn {
+          display: none !important;
+        }
+
+        /* 确保打印内容容器可见且无缩放 */
+        #printable-root {
+          display: block !important;
+          width: 210mm !important; /* A4 Width */
+          max-width: 210mm !important;
+          height: auto !important; /* Allow growing */
+          min-height: 297mm !important;
+          overflow: visible !important;
+          transform: none !important; /* 禁止缩放，防止偏移 */
+          margin: 0 auto !important;
+          padding: 0 !important;
+          position: static !important;
+          box-shadow: none !important;
+          left: auto !important;
+          top: auto !important;
+          background: white !important;
+          page-break-after: auto;
+        }
+        
+        /* 强制打印背景色和图形 */
+        * {
+          -webkit-print-color-adjust: exact !important;
+          print-color-adjust: exact !important;
+        }
+
+        /* 确保我们手动添加的页码可见 */
+        .page-number-marker {
+            display: block !important;
+            visibility: visible !important;
+            color: #6b7280 !important;
+        }
+
+        /* 表格边框打印修正 */
+        table { border-collapse: collapse !important; width: 100% !important; }
+        th, td { border: 1px solid #000 !important; }
+        
+        /* 打印时优化分页 */
+        .break-inside-avoid {
+            break-inside: avoid !important;
+        }
+        .break-after-avoid {
+            break-after: avoid !important;
+        }
+      }
+
+      /* 自定义滚动条 */
+      ::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+      }
+      ::-webkit-scrollbar-track {
+        background: #f1f1f1; 
+      }
+      ::-webkit-scrollbar-thumb {
+        background: #c1c1c1; 
+        border-radius: 4px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: #a8a8a8; 
+      }
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.30.0",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
+    "react/": "https://aistudiocdn.com/react@^19.2.0/",
+    "react": "https://aistudiocdn.com/react@^19.2.0",
+    "lucide-react": "https://aistudiocdn.com/lucide-react@^0.555.0",
+    "docx": "https://cdn.skypack.dev/docx@^8.5.0",
+    "file-saver": "https://cdn.skypack.dev/file-saver@^2.0.5",
+    "html2canvas": "https://cdn.skypack.dev/html2canvas@^1.4.1"
+  }
+}
+</script>
+</head>
+  <body class="bg-gray-100 text-gray-900 h-screen overflow-hidden">
+    <div id="root" class="h-full flex flex-col"></div>
+  </body>
+</html>
