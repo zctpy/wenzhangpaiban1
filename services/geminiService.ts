@@ -1,23 +1,7 @@
 import { GoogleGenAI, Type, Schema } from "@google/genai";
-import { FormattedDocument } from '../types';
+import { FormattedDocument, RefineMode } from '../types';
 
-// Lazy initialization to prevent app crash on load if key is missing
-let aiInstance: GoogleGenAI | null = null;
-
-const getAI = () => {
-    // The API key must be obtained exclusively from the environment variable process.env.API_KEY
-    // as per strict coding guidelines.
-    // Assume process.env.API_KEY is pre-configured and valid.
-    const apiKey = process.env.API_KEY;
-    if (!apiKey) {
-        console.warn("API Key is missing.");
-        return null;
-    }
-    if (!aiInstance) {
-        aiInstance = new GoogleGenAI({ apiKey: apiKey });
-    }
-    return aiInstance;
-};
+const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 const responseSchema: Schema = {
   type: Type.OBJECT,
@@ -36,7 +20,7 @@ const responseSchema: Schema = {
           },
           content: { 
             type: Type.STRING, 
-            description: "段落内容。如果是列表，请用竖线 '|' 分隔每一项，例如 '第一项|第二项'。" 
+            description: "段落内容。如果是列表，请用竖线 '|' 分隔每一项。" 
           }
         },
         required: ["type", "content"]
@@ -46,27 +30,81 @@ const responseSchema: Schema = {
   required: ["title", "sections"]
 };
 
-export const formatTextWithGemini = async (rawText: string, themeId: string): Promise<FormattedDocument> => {
-  const ai = getAI();
-  if (!ai) {
-    throw new Error("API Key 未配置。请在环境变量中设置 API_KEY。");
-  }
-
+export const formatTextWithGemini = async (rawText: string, themeId: string, mode: RefineMode = 'format-strict'): Promise<FormattedDocument> => {
   try {
-    const prompt = `
-      角色：专业文档编辑与排版专家。
-      任务：将输入的文本整理成一篇结构清晰、标点正确、排版美观的文档。
-      
-      输入文本：
-      ${rawText}
+    let systemInstruction = "";
 
-      排版要求：
-      1. **纠正标点**：修正文中不规范的标点符号，确保符合中文出版规范（如全角标点）。
-      2. **层级梳理**：识别并提取一级标题(heading)、二级标题(subheading)。
-      3. **段落重组**：将过长的段落合理拆分，将零散的句子合并为段落(paragraph)。
-      4. **列表识别**：如果内容包含步骤、清单或要点，请务必转换为列表(bullet_list 或 numbered_list)。
-      5. **重点突出**：如果由名言或重要引用，使用引用块(quote)。
-      6. **保持原意**：不要删减核心内容，仅做润色和结构化处理。
+    switch (mode) {
+      case 'format-strict':
+        systemInstruction = `
+          角色：严格的文档排版员。
+          任务：将输入的文本整理成结构化的 JSON 数据。
+          
+          *** 核心原则 (必须严格遵守) ***
+          1. **严禁修改原文**：绝对不要修改、增加或删除原文的任何字词、标点符号。保持原文的原汁原味。
+          2. **仅做结构化**：你的工作只是识别哪些是标题，哪些是段落，哪些是列表。
+          
+          排版规则：
+          1. **层级识别**：根据上下文识别一级标题(heading)和二级标题(subheading)。
+          2. **段落分割**：将文本按自然段落(paragraph)分开。
+          3. **列表识别**：仅当原文明显是列表格式（如带序号或项目符号）时，才转换为列表(bullet_list/numbered_list)。
+          4. **引用识别**：仅当原文明显是引用或名言时，使用引用块(quote)。
+        `;
+        break;
+      
+      case 'polish':
+        systemInstruction = `
+          角色：专业资深编辑。
+          任务：对输入文本进行专业润色，使其更加流畅、优雅、专业。
+          
+          要求：
+          1. 提升文采，优化词汇，修正语病。
+          2. 保持原意不变，不要随意发挥。
+          3. 输出为结构化的 JSON 格式。
+        `;
+        break;
+
+      case 'expand':
+        systemInstruction = `
+          角色：创意写作助手。
+          任务：对输入文本进行适当扩写，丰富细节，增加深度。
+          
+          要求：
+          1. 补充背景信息、细节描述或逻辑论证。
+          2. 保持文章原有的主题和基调。
+          3. 输出为结构化的 JSON 格式。
+        `;
+        break;
+
+      case 'shorten':
+        systemInstruction = `
+          角色：摘要专家。
+          任务：精简文本，保留核心观点，去除冗余信息。
+          
+          要求：
+          1. 语言简练，逻辑清晰。
+          2. 篇幅缩减约 30%-50%。
+          3. 输出为结构化的 JSON 格式。
+        `;
+        break;
+
+      case 'fix':
+        systemInstruction = `
+          角色：校对专家。
+          任务：仅纠正文本中的错别字、标点错误和明显的语法错误。
+          
+          要求：
+          1. 严禁改写句子结构，仅做最小幅度的修正。
+          2. 输出为结构化的 JSON 格式。
+        `;
+        break;
+    }
+
+    const prompt = `
+      ${systemInstruction}
+      
+      待处理文本：
+      ${rawText}
     `;
 
     const response = await ai.models.generateContent({
@@ -85,11 +123,9 @@ export const formatTextWithGemini = async (rawText: string, themeId: string): Pr
     
     // Robust Post-processing
     const sections = parsed.sections.map((section: any) => {
-        // Normalize type to lowercase to avoid case-sensitive render issues
         const type = (section.type || 'paragraph').toLowerCase();
         let content = section.content;
 
-        // Handle Lists (pipe separated)
         if ((type === 'bullet_list' || type === 'numbered_list')) {
            if (typeof content === 'string') {
                if (content.includes('|')) {
@@ -98,15 +134,9 @@ export const formatTextWithGemini = async (rawText: string, themeId: string): Pr
                    content = [content];
                }
            }
-           // If content is already array, keep it.
         } else {
-            // For non-list items, ensure content is a string
-            if (Array.isArray(content)) {
-                content = content.join(' ');
-            }
-            if (typeof content !== 'string') {
-                content = String(content || '');
-            }
+            if (Array.isArray(content)) content = content.join(' ');
+            if (typeof content !== 'string') content = String(content || '');
         }
         
         return { ...section, type, content };

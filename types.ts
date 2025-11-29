@@ -42,3 +42,24 @@ export interface Background {
   className: string; // Tailwind classes for background
   style?: CSSProperties; // Inline styles for complex gradients/patterns
 }
+
+// New type for AI operations
+export type RefineMode = 'format-strict' | 'polish' | 'expand' | 'shorten' | 'fix';
+
+// Content types for Header/Footer areas
+export type HeaderFooterContentType = 'none' | 'title' | 'date' | 'page-number' | 'custom';
+
+export interface HeaderFooterArea {
+  left: HeaderFooterContentType;
+  center: HeaderFooterContentType;
+  right: HeaderFooterContentType;
+  customText: string;
+  showLine: boolean; // Show divider line
+}
+
+export interface PageSettings {
+  header: HeaderFooterArea & { enabled: boolean };
+  footer: HeaderFooterArea & { enabled: boolean };
+  mirrorMargins: boolean; // Different Layout for Odd/Even pages (swaps left/right)
+  hideOnFirstPage: boolean;
+}

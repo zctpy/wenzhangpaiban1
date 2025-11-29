@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import ControlPanel from './components/ControlPanel';
 import A4Canvas from './components/A4Canvas';
 import { THEMES, BACKGROUNDS, DEFAULT_DOC, STOCK_IMAGES } from './constants';
-import { FormattedDocument, Theme, Background, DocumentSection } from './types';
+import { FormattedDocument, Theme, Background, DocumentSection, RefineMode, PageSettings, HeaderFooterContentType } from './types';
 import { formatTextWithGemini } from './services/geminiService';
 import { X, CheckCircle2, Image as ImageIcon, Upload } from 'lucide-react';
 // Fix: Use default import for file-saver to avoid "does not provide an export named 'saveAs'" error
@@ -25,6 +25,29 @@ const App: React.FC = () => {
   
   const [activeSectionIndex, setActiveSectionIndex] = useState<number | null>(null);
   const [isImageModalOpen, setIsImageModalOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+
+  // Page Setup State
+  const [pageSettings, setPageSettings] = useState<PageSettings>({
+      header: {
+          enabled: false,
+          left: 'none',
+          center: 'title',
+          right: 'none',
+          customText: '',
+          showLine: true
+      },
+      footer: {
+          enabled: true,
+          left: 'none',
+          center: 'page-number',
+          right: 'none',
+          customText: '',
+          showLine: false
+      },
+      mirrorMargins: false,
+      hideOnFirstPage: false
+  });
 
   const docToText = (doc: FormattedDocument): string => {
     if (!doc) return "";
@@ -52,30 +75,36 @@ const App: React.FC = () => {
     return text;
   };
 
-  const handleFormat = async () => {
+  const handleFormat = async (mode: RefineMode = 'format-strict') => {
     if (!formattedDoc) return;
     const textToFormat = docToText(formattedDoc);
     
     // Allow even shorter content for testing
     if (textToFormat.trim().length < 2) {
-        setError("内容太少，无法排版");
+        setError("内容太少，无法处理");
         return;
     }
 
     setIsFormatting(true);
     setError(null);
     
+    let successMsg = "排版完成！";
+    if (mode === 'polish') successMsg = "润色完成！";
+    if (mode === 'expand') successMsg = "扩写完成！";
+    if (mode === 'shorten') successMsg = "缩写完成！";
+    if (mode === 'fix') successMsg = "纠错完成！";
+
     try {
-      const newDoc = await formatTextWithGemini(textToFormat, theme.id);
+      const newDoc = await formatTextWithGemini(textToFormat, theme.id, mode);
       if (newDoc) {
         setFormattedDoc(newDoc);
-        setNotification("排版完成！");
+        setNotification(successMsg);
         setTimeout(() => setNotification(null), 2000);
       } else {
          setError("AI 返回了空文档");
       }
     } catch (err) {
-      setError("排版失败，请检查网络或稍后重试。");
+      setError("处理失败，请检查网络或稍后重试。");
       console.error(err);
     } finally {
       setIsFormatting(false);
@@ -102,7 +131,7 @@ const App: React.FC = () => {
         return;
     }
 
-    setNotification("正在生成高清图片...");
+    setNotification("正在生成高清图片(A4尺寸)...");
     const originalZoom = zoom;
     
     try {
@@ -113,13 +142,14 @@ const App: React.FC = () => {
         await new Promise(resolve => setTimeout(resolve, 300));
 
         const canvas = await html2canvas(element, {
-            scale: 2, // 2x Scale for Retina/High Res quality
+            scale: 3, // 3x Scale for approx 300DPI Print Quality
             useCORS: true, // Enable cross-origin image loading
             backgroundColor: '#ffffff', // Ensure white background for transparent parts
             logging: false,
             // Ensure we capture the full height even if scrolled
             height: element.scrollHeight,
-            windowHeight: element.scrollHeight
+            windowHeight: element.scrollHeight,
+            ignoreElements: (element) => element.classList.contains('no-export')
         });
         
         canvas.toBlob((blob) => {
@@ -166,7 +196,7 @@ const App: React.FC = () => {
                 box-shadow: 0 0 10px rgba(0,0,0,0.1);
             }
             /* Hide UI elements in exported HTML */
-            .delete-section-btn, .editor-only, .print\\:hidden { display: none !important; }
+            .delete-section-btn, .editor-only, .print\\:hidden, .no-export { display: none !important; }
             
             /* Add some basic resets for Tailwind classes if they are stripped */
             h1, h2, p, ul, ol { margin-bottom: 1em; }
@@ -270,6 +300,24 @@ const App: React.FC = () => {
       }
   };
 
+  // Helper for Settings Modal Content Selection
+  const SettingsContentSelect = ({ value, onChange, label }: { value: HeaderFooterContentType, onChange: (v: HeaderFooterContentType) => void, label: string }) => (
+      <div className="flex flex-col gap-1">
+          <label className="text-xs font-semibold text-gray-500">{label}</label>
+          <select 
+            value={value} 
+            onChange={(e) => onChange(e.target.value as HeaderFooterContentType)}
+            className="p-2 border rounded text-sm bg-white"
+          >
+              <option value="none">无</option>
+              <option value="title">文档标题</option>
+              <option value="date">当前日期</option>
+              <option value="page-number">页码</option>
+              <option value="custom">自定义文本</option>
+          </select>
+      </div>
+  );
+
   return (
     <div className="flex flex-col h-screen w-full bg-gray-100 overflow-hidden font-sans">
       <ControlPanel 
@@ -289,6 +337,7 @@ const App: React.FC = () => {
         onExportImage={handleExportImage}
         onExportHtml={handleExportHtml}
         onExportWord={handleExportWord}
+        onOpenSettings={() => setIsSettingsOpen(true)}
         zoom={zoom}
         setZoom={setZoom}
       />
@@ -315,6 +364,7 @@ const App: React.FC = () => {
               document={formattedDoc}
               theme={theme}
               background={background}
+              pageSettings={pageSettings}
               zoom={zoom}
               onUpdateContent={updateDocField}
               onUpdateSection={updateSection}
@@ -355,6 +405,135 @@ const App: React.FC = () => {
                 </div>
             </div>
           </div>
+      )}
+
+      {/* Page Setup Modal */}
+      {isSettingsOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 print:hidden animate-in fade-in duration-200">
+            <div className="bg-white w-full max-w-xl rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]">
+                <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 bg-gray-50">
+                    <h2 className="text-lg font-bold text-gray-800">页面设置 (页眉/页脚)</h2>
+                    <button onClick={() => setIsSettingsOpen(false)} className="p-2 hover:bg-gray-200 rounded-full text-gray-500"><X className="w-5 h-5" /></button>
+                </div>
+                <div className="p-6 overflow-y-auto flex flex-col gap-6">
+                    
+                    {/* Header Config */}
+                    <div className="border border-gray-200 rounded-xl p-4">
+                        <div className="flex items-center justify-between mb-4">
+                            <h3 className="font-bold text-gray-700">页眉</h3>
+                            <label className="flex items-center gap-2 text-sm cursor-pointer">
+                                <input 
+                                    type="checkbox" 
+                                    checked={pageSettings.header.enabled}
+                                    onChange={(e) => setPageSettings(prev => ({ ...prev, header: { ...prev.header, enabled: e.target.checked } }))}
+                                    className="w-4 h-4 text-indigo-600 rounded"
+                                />
+                                启用
+                            </label>
+                        </div>
+                        {pageSettings.header.enabled && (
+                            <div className="grid grid-cols-3 gap-3 animate-in fade-in slide-in-from-top-1">
+                                <SettingsContentSelect label="左侧内容" value={pageSettings.header.left} onChange={(v) => setPageSettings(p => ({...p, header: {...p.header, left: v}}))} />
+                                <SettingsContentSelect label="中间内容" value={pageSettings.header.center} onChange={(v) => setPageSettings(p => ({...p, header: {...p.header, center: v}}))} />
+                                <SettingsContentSelect label="右侧内容" value={pageSettings.header.right} onChange={(v) => setPageSettings(p => ({...p, header: {...p.header, right: v}}))} />
+                                <div className="col-span-3">
+                                    <label className="text-xs font-semibold text-gray-500">自定义文本 (仅当选中"自定义"时显示)</label>
+                                    <input 
+                                        type="text" 
+                                        value={pageSettings.header.customText} 
+                                        onChange={(e) => setPageSettings(p => ({...p, header: {...p.header, customText: e.target.value}}))}
+                                        className="w-full p-2 border rounded text-sm mt-1"
+                                        placeholder="请输入页眉文本..."
+                                    />
+                                </div>
+                                <div className="col-span-3 pt-2">
+                                     <label className="flex items-center gap-2 text-sm text-gray-600">
+                                        <input 
+                                            type="checkbox"
+                                            checked={pageSettings.header.showLine}
+                                            onChange={(e) => setPageSettings(p => ({...p, header: {...p.header, showLine: e.target.checked}}))}
+                                        /> 显示分割线
+                                     </label>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Footer Config */}
+                    <div className="border border-gray-200 rounded-xl p-4">
+                        <div className="flex items-center justify-between mb-4">
+                            <h3 className="font-bold text-gray-700">页脚</h3>
+                            <label className="flex items-center gap-2 text-sm cursor-pointer">
+                                <input 
+                                    type="checkbox" 
+                                    checked={pageSettings.footer.enabled}
+                                    onChange={(e) => setPageSettings(prev => ({ ...prev, footer: { ...prev.footer, enabled: e.target.checked } }))}
+                                    className="w-4 h-4 text-indigo-600 rounded"
+                                />
+                                启用
+                            </label>
+                        </div>
+                        {pageSettings.footer.enabled && (
+                            <div className="grid grid-cols-3 gap-3 animate-in fade-in slide-in-from-top-1">
+                                <SettingsContentSelect label="左侧内容" value={pageSettings.footer.left} onChange={(v) => setPageSettings(p => ({...p, footer: {...p.footer, left: v}}))} />
+                                <SettingsContentSelect label="中间内容" value={pageSettings.footer.center} onChange={(v) => setPageSettings(p => ({...p, footer: {...p.footer, center: v}}))} />
+                                <SettingsContentSelect label="右侧内容" value={pageSettings.footer.right} onChange={(v) => setPageSettings(p => ({...p, footer: {...p.footer, right: v}}))} />
+                                <div className="col-span-3">
+                                    <label className="text-xs font-semibold text-gray-500">自定义文本 (仅当选中"自定义"时显示)</label>
+                                    <input 
+                                        type="text" 
+                                        value={pageSettings.footer.customText} 
+                                        onChange={(e) => setPageSettings(p => ({...p, footer: {...p.footer, customText: e.target.value}}))}
+                                        className="w-full p-2 border rounded text-sm mt-1"
+                                        placeholder="请输入页脚文本..."
+                                    />
+                                </div>
+                                <div className="col-span-3 pt-2">
+                                     <label className="flex items-center gap-2 text-sm text-gray-600">
+                                        <input 
+                                            type="checkbox"
+                                            checked={pageSettings.footer.showLine}
+                                            onChange={(e) => setPageSettings(p => ({...p, footer: {...p.footer, showLine: e.target.checked}}))}
+                                        /> 显示分割线
+                                     </label>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* General Options */}
+                    <div className="flex flex-col gap-2">
+                        <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer p-2 hover:bg-gray-50 rounded">
+                            <input 
+                                type="checkbox"
+                                checked={pageSettings.mirrorMargins}
+                                onChange={(e) => setPageSettings(p => ({...p, mirrorMargins: e.target.checked}))}
+                                className="w-4 h-4 text-indigo-600"
+                            />
+                            <span>奇偶页不同 (偶数页左右对调)</span>
+                        </label>
+                         <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer p-2 hover:bg-gray-50 rounded">
+                            <input 
+                                type="checkbox"
+                                checked={pageSettings.hideOnFirstPage}
+                                onChange={(e) => setPageSettings(p => ({...p, hideOnFirstPage: e.target.checked}))}
+                                className="w-4 h-4 text-indigo-600"
+                            />
+                            <span>首页不显示页眉/页脚</span>
+                        </label>
+                    </div>
+
+                </div>
+                <div className="p-4 bg-gray-50 border-t border-gray-100 flex justify-end">
+                    <button 
+                        onClick={() => setIsSettingsOpen(false)}
+                        className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
+                    >
+                        完成
+                    </button>
+                </div>
+            </div>
+        </div>
       )}
     </div>
   );

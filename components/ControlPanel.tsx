@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { THEMES, BACKGROUNDS } from '../constants';
-import { Theme, Background } from '../types';
-import { Wand2, LayoutTemplate, Palette, ChevronDown, ZoomIn, ZoomOut, Image as ImageIcon, RotateCcw, FileCode, Copy, ImageDown, FileText } from 'lucide-react';
+import { Theme, Background, RefineMode } from '../types';
+import { Wand2, LayoutTemplate, Palette, ChevronDown, ZoomIn, ZoomOut, Image as ImageIcon, RotateCcw, FileCode, Copy, ImageDown, FileText, Sparkles, Settings } from 'lucide-react';
 
 interface ControlPanelProps {
   currentTheme: Theme;
@@ -11,11 +11,12 @@ interface ControlPanelProps {
   isFormatting: boolean;
   onInsertImage: () => void;
   onReset: () => void;
-  onFormat: () => void;
+  onFormat: (mode: RefineMode) => void;
   onCopy: () => void;
   onExportImage: () => void;
   onExportHtml: () => void;
   onExportWord: () => void;
+  onOpenSettings: () => void;
   zoom: number;
   setZoom: (z: number) => void;
 }
@@ -25,10 +26,10 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
   currentBackground, setBackground,
   isFormatting, onInsertImage,
   onReset,
-  onFormat, onCopy, onExportImage, onExportHtml, onExportWord,
+  onFormat, onCopy, onExportImage, onExportHtml, onExportWord, onOpenSettings,
   zoom, setZoom
 }) => {
-  const [activeDropdown, setActiveDropdown] = useState<'theme' | 'background' | null>(null);
+  const [activeDropdown, setActiveDropdown] = useState<'theme' | 'background' | 'refine' | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -44,6 +45,11 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
   const handleZoom = (delta: number) => {
     const newZoom = Math.min(Math.max(0.3, zoom + delta), 1.5);
     setZoom(parseFloat(newZoom.toFixed(1)));
+  };
+
+  const handleRefine = (mode: RefineMode) => {
+    onFormat(mode);
+    setActiveDropdown(null);
   };
 
   return (
@@ -150,7 +156,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
 
         <div className="w-px h-6 bg-gray-200 hidden sm:block"></div>
 
-        {/* Group 2: Tools (Reset, Image) */}
+        {/* Group 2: Tools (Reset, Image, Settings) */}
         <div className="flex items-center gap-1">
           <button 
             onClick={onReset}
@@ -158,6 +164,13 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
             title="清空画布"
           >
             <RotateCcw className="w-5 h-5" />
+          </button>
+           <button 
+            onClick={onOpenSettings}
+            className="p-2 text-gray-600 hover:bg-gray-100 hover:text-indigo-600 rounded-lg transition-colors"
+            title="页面设置"
+          >
+            <Settings className="w-5 h-5" />
           </button>
           <button 
             onClick={onInsertImage}
@@ -181,8 +194,9 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                 <span className="hidden sm:inline">复制</span>
             </button>
 
+            {/* Smart Format (Strict) */}
             <button 
-                onClick={onFormat}
+                onClick={() => onFormat('format-strict')}
                 disabled={isFormatting}
                 className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-bold transition-all shadow-sm border
                 ${isFormatting 
@@ -193,6 +207,33 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                 <Wand2 className={`w-4 h-4 ${isFormatting ? 'animate-spin' : ''}`} />
                 <span className="hidden sm:inline">{isFormatting ? '排版中...' : '智能排版'}</span>
             </button>
+
+            {/* AI Refine Dropdown */}
+            <div className="relative">
+              <button 
+                  onClick={() => setActiveDropdown(activeDropdown === 'refine' ? null : 'refine')}
+                  disabled={isFormatting}
+                  className={`flex items-center gap-1 px-2 py-2 rounded-lg text-sm font-bold transition-all shadow-sm border
+                  ${isFormatting 
+                      ? 'bg-gray-100 text-gray-400 cursor-not-allowed border-gray-200' 
+                      : 'bg-white text-indigo-600 hover:bg-indigo-50 border-indigo-200'
+                  }`}
+                  title="AI 润色"
+              >
+                  <Sparkles className="w-4 h-4" />
+                  <ChevronDown className="w-3 h-3" />
+              </button>
+              
+              {activeDropdown === 'refine' && (
+                <div className="absolute top-full right-0 mt-2 w-40 bg-white rounded-xl shadow-xl border border-gray-100 p-2 z-50 animate-in fade-in slide-in-from-top-2">
+                  <div className="text-xs font-bold text-gray-400 px-3 py-2 uppercase">AI 润色</div>
+                  <button onClick={() => handleRefine('polish')} className="w-full text-left px-3 py-2 rounded-lg text-sm hover:bg-indigo-50 text-gray-700">✍️ 全文润色</button>
+                  <button onClick={() => handleRefine('expand')} className="w-full text-left px-3 py-2 rounded-lg text-sm hover:bg-indigo-50 text-gray-700">📝 智能扩写</button>
+                  <button onClick={() => handleRefine('shorten')} className="w-full text-left px-3 py-2 rounded-lg text-sm hover:bg-indigo-50 text-gray-700">✂️ 智能缩写</button>
+                  <button onClick={() => handleRefine('fix')} className="w-full text-left px-3 py-2 rounded-lg text-sm hover:bg-indigo-50 text-gray-700">🔍 纠错校对</button>
+                </div>
+              )}
+            </div>
 
             <div className="h-6 w-px bg-gray-200 mx-1"></div>
 
