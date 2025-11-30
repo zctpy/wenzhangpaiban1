@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { FormattedDocument, Theme, Background, PageSettings, HeaderFooterContentType } from '../types';
+import { FormattedDocument, Theme, Background } from '../types';
 import { Quote, Trash2, AlertCircle } from 'lucide-react';
 
 interface SectionWrapperProps {
@@ -11,7 +11,7 @@ const SectionWrapper: React.FC<SectionWrapperProps> = ({ children, onDelete }) =
   <div className="relative group/section -ml-8 pl-8 transition-colors hover:bg-gray-50/30 rounded pr-2 break-inside-avoid">
       <button 
           onClick={onDelete}
-          className="absolute left-0 top-1/2 -translate-y-1/2 p-1.5 text-gray-300 hover:text-red-500 opacity-0 group-hover/section:opacity-100 transition-opacity print:hidden z-30 delete-section-btn"
+          className="absolute left-0 top-1/2 -translate-y-1/2 p-1.5 text-gray-300 hover:text-red-500 opacity-0 group-hover/section:opacity-100 transition-opacity print:hidden z-30 delete-section-btn no-export"
           title="删除此段落"
       >
           <Trash2 className="w-4 h-4" />
@@ -24,7 +24,6 @@ interface A4CanvasProps {
   document: FormattedDocument | null;
   theme: Theme;
   background: Background;
-  pageSettings: PageSettings;
   zoom: number;
   onUpdateContent: (key: string, value: any, index?: number) => void;
   onUpdateSection: (index: number, content: any) => void;
@@ -36,7 +35,6 @@ const A4Canvas: React.FC<A4CanvasProps> = ({
   document, 
   theme, 
   background, 
-  pageSettings,
   zoom, 
   onUpdateContent,
   onUpdateSection,
@@ -82,45 +80,6 @@ const A4Canvas: React.FC<A4CanvasProps> = ({
   // Calculate page count based on content height (min 1 page)
   const pageCount = Math.max(1, Math.ceil((contentHeight || 1) / A4_HEIGHT_PX));
   const pages = Array.from({ length: pageCount }, (_, i) => i + 1);
-
-  // Helper to resolve header/footer content
-  const resolveContent = (type: HeaderFooterContentType, custom: string, pageNum: number): string => {
-      switch (type) {
-          case 'title': return document.title || '';
-          case 'date': return new Date().toLocaleDateString();
-          case 'page-number': return `${pageNum}`;
-          case 'custom': return custom || '';
-          default: return '';
-      }
-  };
-
-  const renderHeaderFooterArea = (type: 'header' | 'footer', pageNum: number) => {
-      const config = pageSettings[type];
-      if (!config.enabled) return null;
-      if (pageSettings.hideOnFirstPage && pageNum === 1) return null;
-
-      // Handle Mirror Margins (swap left/right on even pages)
-      const isEven = pageNum % 2 === 0;
-      let left = config.left;
-      let right = config.right;
-      
-      if (pageSettings.mirrorMargins && isEven) {
-          left = config.right;
-          right = config.left;
-      }
-
-      const leftContent = resolveContent(left, config.customText, pageNum);
-      const centerContent = resolveContent(config.center, config.customText, pageNum);
-      const rightContent = resolveContent(right, config.customText, pageNum);
-
-      return (
-          <div className={`w-full flex items-center justify-between text-[10pt] ${theme.secondaryColor} ${theme.fontBody} px-[25.4mm] h-[15mm] ${config.showLine ? (type === 'header' ? 'border-b' : 'border-t') : ''} border-gray-300`}>
-              <div className="flex-1 text-left">{leftContent}</div>
-              <div className="flex-1 text-center">{centerContent}</div>
-              <div className="flex-1 text-right">{rightContent}</div>
-          </div>
-      );
-  };
 
   const getHeadingRender = (level: 'main' | 'sub', content: string, commonProps: any) => {
       const Tag = level === 'main' ? 'h1' : 'h2';
@@ -209,7 +168,7 @@ const A4Canvas: React.FC<A4CanvasProps> = ({
            />
         )}
 
-        {/* Page Overlays (Header/Footer/Guides) */}
+        {/* Page Guides (Editor Only) */}
         <div className="absolute inset-0 z-10 pointer-events-none overflow-hidden print:overflow-visible">
             {pages.map((pageNum) => (
                 <div 
@@ -220,19 +179,9 @@ const A4Canvas: React.FC<A4CanvasProps> = ({
                         height: `${A4_HEIGHT_MM}mm`,
                     }}
                 >
-                    {/* Header Area */}
-                    <div className="pt-[10mm] w-full z-50">
-                        {renderHeaderFooterArea('header', pageNum)}
-                    </div>
-
-                    {/* Footer Area */}
-                    <div className="pb-[10mm] w-full z-50">
-                         {renderHeaderFooterArea('footer', pageNum)}
-                    </div>
-
                      {/* Visual Page Break (Editor Only) */}
                     {pageNum < pageCount && (
-                         <div className="absolute bottom-0 w-full border-b border-dashed border-gray-300 print:hidden opacity-50" />
+                         <div className="absolute bottom-0 w-full border-b border-dashed border-gray-300 print:hidden opacity-50 no-export" />
                     )}
                 </div>
             ))}
@@ -269,7 +218,7 @@ const A4Canvas: React.FC<A4CanvasProps> = ({
             )}
             {document.author && (
               <div className={`flex items-center gap-3 ${theme.headingStyle === 'centered-line' ? 'justify-center' : ''} text-[12pt] uppercase tracking-[0.2em] ${theme.fontBody} text-gray-500 font-bold mb-10`}>
-                <span className="w-8 h-8 flex items-center justify-center opacity-0 group-hover/header:opacity-100 cursor-move text-gray-300 print:hidden delete-section-btn">⋮⋮</span>
+                <span className="w-8 h-8 flex items-center justify-center opacity-0 group-hover/header:opacity-100 cursor-move text-gray-300 print:hidden delete-section-btn no-export">⋮⋮</span>
                 <span className="w-8 h-[1px] bg-gray-300 inline-block"></span>
                 <span 
                     contentEditable

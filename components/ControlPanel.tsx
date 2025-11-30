@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { THEMES, BACKGROUNDS } from '../constants';
 import { Theme, Background, RefineMode } from '../types';
-import { Wand2, LayoutTemplate, Palette, ChevronDown, ZoomIn, ZoomOut, Image as ImageIcon, RotateCcw, FileCode, Copy, ImageDown, FileText, Sparkles, Settings } from 'lucide-react';
+import { Wand2, LayoutTemplate, Palette, ChevronDown, ZoomIn, ZoomOut, Image as ImageIcon, RotateCcw, FileCode, Copy, ImageDown, FileText, Sparkles } from 'lucide-react';
 
 interface ControlPanelProps {
   currentTheme: Theme;
@@ -16,7 +16,6 @@ interface ControlPanelProps {
   onExportImage: () => void;
   onExportHtml: () => void;
   onExportWord: () => void;
-  onOpenSettings: () => void;
   zoom: number;
   setZoom: (z: number) => void;
 }
@@ -26,7 +25,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
   currentBackground, setBackground,
   isFormatting, onInsertImage,
   onReset,
-  onFormat, onCopy, onExportImage, onExportHtml, onExportWord, onOpenSettings,
+  onFormat, onCopy, onExportImage, onExportHtml, onExportWord,
   zoom, setZoom
 }) => {
   const [activeDropdown, setActiveDropdown] = useState<'theme' | 'background' | 'refine' | null>(null);
@@ -156,7 +155,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
 
         <div className="w-px h-6 bg-gray-200 hidden sm:block"></div>
 
-        {/* Group 2: Tools (Reset, Image, Settings) */}
+        {/* Group 2: Tools (Reset, Image) */}
         <div className="flex items-center gap-1">
           <button 
             onClick={onReset}
@@ -164,13 +163,6 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
             title="清空画布"
           >
             <RotateCcw className="w-5 h-5" />
-          </button>
-           <button 
-            onClick={onOpenSettings}
-            className="p-2 text-gray-600 hover:bg-gray-100 hover:text-indigo-600 rounded-lg transition-colors"
-            title="页面设置"
-          >
-            <Settings className="w-5 h-5" />
           </button>
           <button 
             onClick={onInsertImage}

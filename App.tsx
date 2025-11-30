@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import ControlPanel from './components/ControlPanel';
 import A4Canvas from './components/A4Canvas';
 import { THEMES, BACKGROUNDS, DEFAULT_DOC, STOCK_IMAGES } from './constants';
-import { FormattedDocument, Theme, Background, DocumentSection, RefineMode, PageSettings, HeaderFooterContentType } from './types';
+import { FormattedDocument, Theme, Background, DocumentSection, RefineMode } from './types';
 import { formatTextWithGemini } from './services/geminiService';
 import { X, CheckCircle2, Image as ImageIcon, Upload } from 'lucide-react';
 // Fix: Use default import for file-saver to avoid "does not provide an export named 'saveAs'" error
@@ -25,29 +25,6 @@ const App: React.FC = () => {
   
   const [activeSectionIndex, setActiveSectionIndex] = useState<number | null>(null);
   const [isImageModalOpen, setIsImageModalOpen] = useState(false);
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-
-  // Page Setup State
-  const [pageSettings, setPageSettings] = useState<PageSettings>({
-      header: {
-          enabled: false,
-          left: 'none',
-          center: 'title',
-          right: 'none',
-          customText: '',
-          showLine: true
-      },
-      footer: {
-          enabled: true,
-          left: 'none',
-          center: 'page-number',
-          right: 'none',
-          customText: '',
-          showLine: false
-      },
-      mirrorMargins: false,
-      hideOnFirstPage: false
-  });
 
   const docToText = (doc: FormattedDocument): string => {
     if (!doc) return "";
@@ -177,35 +154,52 @@ const App: React.FC = () => {
 
       const html = `
         <!DOCTYPE html>
-        <html>
+        <html lang="zh-CN">
         <head>
           <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
           <title>${formattedDoc.title || 'SmartDoc'}</title>
+          
+          <!-- Inject Tailwind CSS for correct styling -->
+          <script src="https://cdn.tailwindcss.com"></script>
+          <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700&family=Noto+Serif+SC:wght@300;400;600;700&family=Zhi+Mang+Xing&family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+          <script>
+            tailwind.config = {
+                theme: {
+                extend: {
+                    fontFamily: {
+                    sans: ['"Noto Sans SC"', 'Inter', 'system-ui', 'sans-serif'],
+                    serif: ['"Noto Serif SC"', '"Songti SC"', '"SimSun"', '"Adobe Song Std"', 'serif'],
+                    display: ['"Zhi Mang Xing"', 'cursive'],
+                    body: ['"Noto Sans SC"', 'sans-serif'],
+                    'fangsong': ['"FangSong"', '"STFangsong"', '"Noto Serif SC"', 'serif'],
+                    },
+                    colors: {
+                    paper: '#fdfbf7',
+                    }
+                },
+                },
+            }
+          </script>
+
           <style>
             body { 
-                font-family: "Noto Sans SC", sans-serif; 
                 padding: 40px; 
                 background: #fdfbf7; 
-                color: ${theme.exportColors.primary};
+                min-height: 100vh;
             }
             #printable-root { 
                 max-width: 210mm; 
                 margin: 0 auto; 
                 background: white; 
-                padding: 25.4mm; 
+                padding: 0 !important; /* Let inner padding handle it */
                 box-shadow: 0 0 10px rgba(0,0,0,0.1);
+                /* Ensure background image scales correctly */
+                background-size: cover;
+                transform: none !important;
             }
             /* Hide UI elements in exported HTML */
             .delete-section-btn, .editor-only, .print\\:hidden, .no-export { display: none !important; }
-            
-            /* Add some basic resets for Tailwind classes if they are stripped */
-            h1, h2, p, ul, ol { margin-bottom: 1em; }
-            h1 { font-size: 32pt; font-weight: bold; }
-            h2 { font-size: 22pt; font-weight: bold; }
-            p { font-size: 16pt; line-height: 1.8; text-align: justify; }
-            ul, ol { padding-left: 2em; }
-            img { max-width: 100%; }
-            .bg-gray-50\\/80 { background: #f9fafb; padding: 20px; border-radius: 8px; }
           </style>
         </head>
         <body>
@@ -300,24 +294,6 @@ const App: React.FC = () => {
       }
   };
 
-  // Helper for Settings Modal Content Selection
-  const SettingsContentSelect = ({ value, onChange, label }: { value: HeaderFooterContentType, onChange: (v: HeaderFooterContentType) => void, label: string }) => (
-      <div className="flex flex-col gap-1">
-          <label className="text-xs font-semibold text-gray-500">{label}</label>
-          <select 
-            value={value} 
-            onChange={(e) => onChange(e.target.value as HeaderFooterContentType)}
-            className="p-2 border rounded text-sm bg-white"
-          >
-              <option value="none">无</option>
-              <option value="title">文档标题</option>
-              <option value="date">当前日期</option>
-              <option value="page-number">页码</option>
-              <option value="custom">自定义文本</option>
-          </select>
-      </div>
-  );
-
   return (
     <div className="flex flex-col h-screen w-full bg-gray-100 overflow-hidden font-sans">
       <ControlPanel 
@@ -337,7 +313,6 @@ const App: React.FC = () => {
         onExportImage={handleExportImage}
         onExportHtml={handleExportHtml}
         onExportWord={handleExportWord}
-        onOpenSettings={() => setIsSettingsOpen(true)}
         zoom={zoom}
         setZoom={setZoom}
       />
@@ -364,7 +339,6 @@ const App: React.FC = () => {
               document={formattedDoc}
               theme={theme}
               background={background}
-              pageSettings={pageSettings}
               zoom={zoom}
               onUpdateContent={updateDocField}
               onUpdateSection={updateSection}
@@ -405,135 +379,6 @@ const App: React.FC = () => {
                 </div>
             </div>
           </div>
-      )}
-
-      {/* Page Setup Modal */}
-      {isSettingsOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 print:hidden animate-in fade-in duration-200">
-            <div className="bg-white w-full max-w-xl rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]">
-                <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 bg-gray-50">
-                    <h2 className="text-lg font-bold text-gray-800">页面设置 (页眉/页脚)</h2>
-                    <button onClick={() => setIsSettingsOpen(false)} className="p-2 hover:bg-gray-200 rounded-full text-gray-500"><X className="w-5 h-5" /></button>
-                </div>
-                <div className="p-6 overflow-y-auto flex flex-col gap-6">
-                    
-                    {/* Header Config */}
-                    <div className="border border-gray-200 rounded-xl p-4">
-                        <div className="flex items-center justify-between mb-4">
-                            <h3 className="font-bold text-gray-700">页眉</h3>
-                            <label className="flex items-center gap-2 text-sm cursor-pointer">
-                                <input 
-                                    type="checkbox" 
-                                    checked={pageSettings.header.enabled}
-                                    onChange={(e) => setPageSettings(prev => ({ ...prev, header: { ...prev.header, enabled: e.target.checked } }))}
-                                    className="w-4 h-4 text-indigo-600 rounded"
-                                />
-                                启用
-                            </label>
-                        </div>
-                        {pageSettings.header.enabled && (
-                            <div className="grid grid-cols-3 gap-3 animate-in fade-in slide-in-from-top-1">
-                                <SettingsContentSelect label="左侧内容" value={pageSettings.header.left} onChange={(v) => setPageSettings(p => ({...p, header: {...p.header, left: v}}))} />
-                                <SettingsContentSelect label="中间内容" value={pageSettings.header.center} onChange={(v) => setPageSettings(p => ({...p, header: {...p.header, center: v}}))} />
-                                <SettingsContentSelect label="右侧内容" value={pageSettings.header.right} onChange={(v) => setPageSettings(p => ({...p, header: {...p.header, right: v}}))} />
-                                <div className="col-span-3">
-                                    <label className="text-xs font-semibold text-gray-500">自定义文本 (仅当选中"自定义"时显示)</label>
-                                    <input 
-                                        type="text" 
-                                        value={pageSettings.header.customText} 
-                                        onChange={(e) => setPageSettings(p => ({...p, header: {...p.header, customText: e.target.value}}))}
-                                        className="w-full p-2 border rounded text-sm mt-1"
-                                        placeholder="请输入页眉文本..."
-                                    />
-                                </div>
-                                <div className="col-span-3 pt-2">
-                                     <label className="flex items-center gap-2 text-sm text-gray-600">
-                                        <input 
-                                            type="checkbox"
-                                            checked={pageSettings.header.showLine}
-                                            onChange={(e) => setPageSettings(p => ({...p, header: {...p.header, showLine: e.target.checked}}))}
-                                        /> 显示分割线
-                                     </label>
-                                </div>
-                            </div>
-                        )}
-                    </div>
-
-                    {/* Footer Config */}
-                    <div className="border border-gray-200 rounded-xl p-4">
-                        <div className="flex items-center justify-between mb-4">
-                            <h3 className="font-bold text-gray-700">页脚</h3>
-                            <label className="flex items-center gap-2 text-sm cursor-pointer">
-                                <input 
-                                    type="checkbox" 
-                                    checked={pageSettings.footer.enabled}
-                                    onChange={(e) => setPageSettings(prev => ({ ...prev, footer: { ...prev.footer, enabled: e.target.checked } }))}
-                                    className="w-4 h-4 text-indigo-600 rounded"
-                                />
-                                启用
-                            </label>
-                        </div>
-                        {pageSettings.footer.enabled && (
-                            <div className="grid grid-cols-3 gap-3 animate-in fade-in slide-in-from-top-1">
-                                <SettingsContentSelect label="左侧内容" value={pageSettings.footer.left} onChange={(v) => setPageSettings(p => ({...p, footer: {...p.footer, left: v}}))} />
-                                <SettingsContentSelect label="中间内容" value={pageSettings.footer.center} onChange={(v) => setPageSettings(p => ({...p, footer: {...p.footer, center: v}}))} />
-                                <SettingsContentSelect label="右侧内容" value={pageSettings.footer.right} onChange={(v) => setPageSettings(p => ({...p, footer: {...p.footer, right: v}}))} />
-                                <div className="col-span-3">
-                                    <label className="text-xs font-semibold text-gray-500">自定义文本 (仅当选中"自定义"时显示)</label>
-                                    <input 
-                                        type="text" 
-                                        value={pageSettings.footer.customText} 
-                                        onChange={(e) => setPageSettings(p => ({...p, footer: {...p.footer, customText: e.target.value}}))}
-                                        className="w-full p-2 border rounded text-sm mt-1"
-                                        placeholder="请输入页脚文本..."
-                                    />
-                                </div>
-                                <div className="col-span-3 pt-2">
-                                     <label className="flex items-center gap-2 text-sm text-gray-600">
-                                        <input 
-                                            type="checkbox"
-                                            checked={pageSettings.footer.showLine}
-                                            onChange={(e) => setPageSettings(p => ({...p, footer: {...p.footer, showLine: e.target.checked}}))}
-                                        /> 显示分割线
-                                     </label>
-                                </div>
-                            </div>
-                        )}
-                    </div>
-
-                    {/* General Options */}
-                    <div className="flex flex-col gap-2">
-                        <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer p-2 hover:bg-gray-50 rounded">
-                            <input 
-                                type="checkbox"
-                                checked={pageSettings.mirrorMargins}
-                                onChange={(e) => setPageSettings(p => ({...p, mirrorMargins: e.target.checked}))}
-                                className="w-4 h-4 text-indigo-600"
-                            />
-                            <span>奇偶页不同 (偶数页左右对调)</span>
-                        </label>
-                         <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer p-2 hover:bg-gray-50 rounded">
-                            <input 
-                                type="checkbox"
-                                checked={pageSettings.hideOnFirstPage}
-                                onChange={(e) => setPageSettings(p => ({...p, hideOnFirstPage: e.target.checked}))}
-                                className="w-4 h-4 text-indigo-600"
-                            />
-                            <span>首页不显示页眉/页脚</span>
-                        </label>
-                    </div>
-
-                </div>
-                <div className="p-4 bg-gray-50 border-t border-gray-100 flex justify-end">
-                    <button 
-                        onClick={() => setIsSettingsOpen(false)}
-                        className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
-                    >
-                        完成
-                    </button>
-                </div>
-            </div>
-        </div>
       )}
     </div>
   );
